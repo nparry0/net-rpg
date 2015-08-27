@@ -1,46 +1,49 @@
 package main
 
 import (
-  "io"
   "log"
-  "net"
-  "crypto/rand"
-  "crypto/tls"
+  "github.com/nparry0/network"
 )
 
-func echo(con net.Conn) {
-    _, err := io.Copy(con, con)
+/* Each client gets one of these threads to listen to it,
+   send data to it, and handle validation */
+func clientConnThread(conn *network.GameConn) {
+  for {
+    req, err := network.Recv(conn);
     if err != nil {
-        log.Print(err)
+      log.Print(err)
+      return
     }
-    err = con.Close()
+
+    log.Printf("Client sent:%s\n", req);
+
+    resp := map[string]interface{}{"success":true}
+
+    err = network.Send(conn, resp);
     if err != nil {
-        log.Print(err)
+      log.Print(err)
+      return
     }
+  }
 }
 
 func main() {
   log.SetFlags(log.Lshortfile)
 
-  cert, err := tls.LoadX509KeyPair("server.pem", "server.key")
+  ln, err := network.Listen("")
   if err != nil {
     log.Fatal(err)
   }
 
-  config := tls.Config{Certificates: []tls.Certificate{cert} }
-  config.Rand = rand.Reader
-
-  ln, err := tls.Listen("tcp", ":10101", &config)
-  if err != nil {
-    log.Fatal(err)
-  }
   for {
-    con, err := ln.Accept()
-      if err != nil {
-        log.Fatal(err)
-      }
-    go echo(con)
+    conn, err := network.Accept(ln)
+    if err != nil {
+      log.Print(err)
+    } else {
+      go clientConnThread(conn)
+    }
   }
+
   err = ln.Close()
   if err != nil {
     log.Fatal(err)
