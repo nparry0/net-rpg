@@ -3,6 +3,7 @@ package network
 import (
     "net"
     "encoding/json"
+    "crypto/tls"
 )
 
 type GameConn struct {
@@ -19,7 +20,8 @@ func Connect(server string)(*GameConn, error){
       server = ":10101"
     }
 
-    c, err := net.Dial("tcp", server)
+    //TODO: Actual hostname and a real cert
+    c, err := tls.Dial("tcp", server, &tls.Config{ServerName:"localhost", InsecureSkipVerify:true})
     if err != nil {
       return nil, err
     }
