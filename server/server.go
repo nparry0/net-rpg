@@ -3,22 +3,61 @@ package main
 import (
   "log"
   "github.com/nparry0/network"
+  "strconv"
 )
+
+var MIN_CLIENT_VERSION int = 1
 
 /* Each client gets one of these threads to listen to it, send data to it, 
    and handle validation for the life of the client */
 func clientConnThread(conn *network.GameConn) {
+  var user *User;  
+
   for {
-    req, err := network.Recv(conn);
+    resp := network.GameMsg{Resp:&network.Resp{Success:false}}
+
+    req, msgType, err := network.Recv(conn)
     if err != nil {
       log.Print(err)
       return
     }
 
-    log.Printf("clientConnThread: %s\n", req);
-    resp := network.GameMsg{Resp:&network.Resp{Success:true}}
+    switch msgType {
 
-    err = network.Send(conn, resp);
+    // Log in request
+    case network.TypeLoginReq:
+
+      // A few sanity checks
+      if req.LoginReq.Version < MIN_CLIENT_VERSION {
+        log.Printf("Attempt to log in with old client version %d (min version is %d)\n", req.LoginReq.Version, MIN_CLIENT_VERSION)
+        resp.Resp.Message = "Your client version is too old for this server.  Please update to the latest version."
+        break;
+      }
+      if user != nil {
+        log.Printf("Multiple login attempts from %s\n", req.LoginReq.Username)
+        resp.Resp.Message = "ERROR: Duplicate login attempt."
+        break;
+      }
+
+      user, err = userLogin(req.LoginReq.Username, req.LoginReq.Password)
+      if err != nil {
+        log.Printf("Failed login for user %s\n", req.LoginReq.Username)
+        resp.Resp.Message = "Incorrect username or password.  Please try again."
+        break;
+      } 
+
+      // Successfully logged in
+      log.Printf("Successful login from %s\n", req.LoginReq.Username)
+      resp.Resp.Message = "Successfully logged in as " + user.Username
+      resp.Resp.Success = true;
+
+    default:
+      log.Printf("Recv'd invalid type: %d\n", msgType)
+      resp.Resp.Message = "ERROR: Invalid message type (" + strconv.Itoa(msgType) + ")."
+    }
+
+    // Send response and listen for another message
+    err = network.Send(conn, resp)
     if err != nil {
       log.Print(err)
       return

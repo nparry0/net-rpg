@@ -12,17 +12,19 @@ import (
 /***** Comms API *****/
 /*********************/
 const (
-  TypeResp int = iota
+  TypeError int = iota
+  TypeResp
   TypeLoginReq
   TypeCmd
 )
 
 type Resp struct {
   Success bool
+  Message string
 }
 
 type LoginReq struct {
-  Version int
+  Version int //Not every struct needs a version field, but login does for client version
   Username string
   Password string
 }
@@ -64,62 +66,61 @@ func Listen(port string)(net.Listener, error){
 }
 
 func Accept(ln net.Listener)(*GameConn, error){
-    var conn GameConn;
+  var conn GameConn;
 
-    c, err := ln.Accept()
-    if err != nil {
-      return nil, err 
-    }
+  c, err := ln.Accept()
+  if err != nil {
+    return nil, err 
+  }
 
-    conn.conn = c
-    conn.enc = json.NewEncoder(conn.conn)
-    conn.dec = json.NewDecoder(conn.conn)
-    return &conn, nil
+  conn.conn = c
+  conn.enc = json.NewEncoder(conn.conn)
+  conn.dec = json.NewDecoder(conn.conn)
+  return &conn, nil
 }
 
 func Connect(server string)(*GameConn, error){
-    var conn GameConn;
+  var conn GameConn;
 
-    //TODO: Name Resolution
-    if server == "" {
-      server = ":10101"
-    }
+  //TODO: Name Resolution
+  if server == "" {
+    server = ":10101"
+  }
 
-    //TODO: Actual hostname and a real cert
-    c, err := tls.Dial("tcp", server, &tls.Config{ServerName:"localhost", InsecureSkipVerify:true})
-    if err != nil {
-      return nil, err
-    }
+  //TODO: Actual hostname and a real cert
+  c, err := tls.Dial("tcp", server, &tls.Config{ServerName:"localhost", InsecureSkipVerify:true})
+  if err != nil {
+    return nil, err
+  }
 
-    conn.conn = c
-    conn.enc = json.NewEncoder(conn.conn)
-    conn.dec = json.NewDecoder(conn.conn)
-    return &conn, nil
+  conn.conn = c
+  conn.enc = json.NewEncoder(conn.conn)
+  conn.dec = json.NewDecoder(conn.conn)
+  return &conn, nil
 }
 
 func Send(conn *GameConn, req interface{})(error) {
-    //log.Printf("Send: %s\n", req);
-    err := conn.enc.Encode(req)
-    return err
+  //log.Printf("Send: %s\n", req);
+  err := conn.enc.Encode(req)
+  return err
 }
 
-func Recv(conn *GameConn)(*GameMsg, error) {
-    var resp GameMsg
+func Recv(conn *GameConn)(*GameMsg, int, error) {
+  var resp GameMsg
+  var respType int
 
-    err := conn.dec.Decode(&resp)
-    if err != nil {
-      return nil, err
-    }
+  err := conn.dec.Decode(&resp)
+  if err != nil {
+    return nil, TypeError, err
+  }
 
-    /*
-    if resp.Resp != nil {
-      log.Printf("Recv: Resp\n");
-    } else if resp.LoginReq != nil {
-      log.Printf("Recv: LoginMsg\n");
-    } else {
-      log.Printf("Recv: %s\n", resp);
-    }
-    */
-    
-    return &resp, nil;
+  if resp.Resp != nil {
+    respType = TypeResp
+  } else if resp.LoginReq != nil {
+    respType = TypeLoginReq
+  } else {
+    respType = TypeCmd
+  }
+
+  return &resp, respType, nil;
 }
