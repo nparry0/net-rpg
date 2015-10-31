@@ -15,12 +15,14 @@ const (
   TypeError int = iota
   TypeResp
   TypeLoginReq
+  TypeAssumeActorReq
   TypeCmd
 )
 
 type Resp struct {
   Success bool
   Message string
+  Data []string
 }
 
 type LoginReq struct {
@@ -29,9 +31,14 @@ type LoginReq struct {
   Password string
 }
 
+type AssumeActorReq struct {
+  Actor string
+}
+
 type GameMsg struct {
   Resp *Resp
   LoginReq *LoginReq
+  AssumeActorReq *AssumeActorReq
 }
 
 /*************************/
@@ -118,6 +125,8 @@ func Recv(conn *GameConn)(*GameMsg, int, error) {
     respType = TypeResp
   } else if resp.LoginReq != nil {
     respType = TypeLoginReq
+  } else if resp.AssumeActorReq != nil {
+    respType = TypeAssumeActorReq
   } else {
     respType = TypeCmd
   }

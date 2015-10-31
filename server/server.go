@@ -12,6 +12,7 @@ var MIN_CLIENT_VERSION int = 1
    and handle validation for the life of the client */
 func clientConnThread(conn *network.GameConn) {
   var user *User;  
+  var actor *Actor;  
 
   for {
     resp := network.GameMsg{Resp:&network.Resp{Success:false}}
@@ -26,7 +27,6 @@ func clientConnThread(conn *network.GameConn) {
 
     // Log in request
     case network.TypeLoginReq:
-
       // A few sanity checks
       if req.LoginReq.Version < MIN_CLIENT_VERSION {
         log.Printf("Attempt to log in with old client version %d (min version is %d)\n", req.LoginReq.Version, MIN_CLIENT_VERSION)
@@ -49,6 +49,27 @@ func clientConnThread(conn *network.GameConn) {
       // Successfully logged in
       log.Printf("Successful login from %s\n", req.LoginReq.Username)
       resp.Resp.Message = "Successfully logged in as " + user.Username
+      resp.Resp.Data = user.Actors
+      resp.Resp.Success = true;
+
+    // Request to assume actor
+    case network.TypeAssumeActorReq:
+      if user == nil {
+        log.Printf("Attempted to assume %s without logging in\n", req.AssumeActorReq.Actor)
+        resp.Resp.Message = "You must log in first"
+        break;
+      }
+
+      actor, err = assumeActor(req.AssumeActorReq.Actor, user)
+      if err != nil {
+        log.Printf("User %s failed to assume actor %s\n", user.Username, req.AssumeActorReq.Actor)
+        resp.Resp.Message = "Unable to use that character"
+        break;
+      } 
+
+      // Successfully logged in
+      log.Printf("User %s successfully assumed actor %s\n", user.Username, req.AssumeActorReq.Actor)
+      resp.Resp.Message = "Successfully assumed character " + actor.Name
       resp.Resp.Success = true;
 
     default:

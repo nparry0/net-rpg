@@ -13,7 +13,7 @@ type User struct {
   Username string
   PasswordHash string
   Email string
-  Characters []string
+  Actors []string
 }
 
 func checkName(name string)(bool) {
