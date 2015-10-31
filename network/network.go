@@ -1,12 +1,40 @@
 package network
 
 import (
+//  "log"
   "net"
   "encoding/json"
   "crypto/tls"
   "crypto/rand"
 )
 
+/*********************/
+/***** Comms API *****/
+/*********************/
+const (
+  TypeResp int = iota
+  TypeLoginReq
+  TypeCmd
+)
+
+type Resp struct {
+  Success bool
+}
+
+type LoginReq struct {
+  Version int
+  Username string
+  Password string
+}
+
+type GameMsg struct {
+  Resp *Resp
+  LoginReq *LoginReq
+}
+
+/*************************/
+/***** Net functions *****/
+/*************************/
 type GameConn struct {
   conn net.Conn
   dec * json.Decoder
@@ -69,17 +97,29 @@ func Connect(server string)(*GameConn, error){
     return &conn, nil
 }
 
-func Send(conn *GameConn, req map[string]interface{})(error) {
+func Send(conn *GameConn, req interface{})(error) {
+    //log.Printf("Send: %s\n", req);
     err := conn.enc.Encode(req)
     return err
 }
 
-func Recv(conn *GameConn)(map[string]interface{}, error) {
-    var resp map[string]interface{} 
+func Recv(conn *GameConn)(*GameMsg, error) {
+    var resp GameMsg
 
     err := conn.dec.Decode(&resp)
     if err != nil {
       return nil, err
     }
-    return resp, nil;
+
+    /*
+    if resp.Resp != nil {
+      log.Printf("Recv: Resp\n");
+    } else if resp.LoginReq != nil {
+      log.Printf("Recv: LoginMsg\n");
+    } else {
+      log.Printf("Recv: %s\n", resp);
+    }
+    */
+    
+    return &resp, nil;
 }

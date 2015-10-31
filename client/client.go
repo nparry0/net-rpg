@@ -1,9 +1,9 @@
 package main
 
 import (
-    "log"
-    "fmt"
-    "github.com/nparry0/network"
+  "log"
+  "fmt"
+  "github.com/nparry0/network"
 )
 
 func main() {
@@ -11,15 +11,16 @@ func main() {
 
     // Prompt the user for their name and pass
     var name, pass string
-    fmt.Printf("*** Stuff N' Things the RPG ***\n");
-    fmt.Printf("Login:");
-    fmt.Scanln(&name); 
-    fmt.Printf("Password:");
-    fmt.Scanln(&pass); 
+    fmt.Printf("*** Stuff N' Things the RPG ***\n")
+    fmt.Printf("Login:")
+    fmt.Scanln(&name)
+    fmt.Printf("Password:")
+    fmt.Scanln(&pass)
   
-    fmt.Printf("Logging in as %s\n", name);
+    fmt.Printf("Logging in as %s\n", name)
     
-    req := map[string]interface{}{"username":name, "password":pass}
+    req := network.GameMsg{LoginReq:&network.LoginReq{Version:1, Username:name, Password:pass}}
+    //log.Printf("main: %s\n", req);
 
     // Connect to the server
     conn, err := network.Connect("")
@@ -38,5 +39,6 @@ func main() {
     if err != nil {
       log.Fatal(err)
     }
+
     fmt.Printf("Response was %s \n", resp);
 }

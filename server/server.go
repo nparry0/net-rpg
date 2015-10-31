@@ -5,8 +5,8 @@ import (
   "github.com/nparry0/network"
 )
 
-/* Each client gets one of these threads to listen to it,
-   send data to it, and handle validation */
+/* Each client gets one of these threads to listen to it, send data to it, 
+   and handle validation for the life of the client */
 func clientConnThread(conn *network.GameConn) {
   for {
     req, err := network.Recv(conn);
@@ -15,9 +15,8 @@ func clientConnThread(conn *network.GameConn) {
       return
     }
 
-    log.Printf("Client sent:%s\n", req);
-
-    resp := map[string]interface{}{"success":true}
+    log.Printf("clientConnThread: %s\n", req);
+    resp := network.GameMsg{Resp:&network.Resp{Success:true}}
 
     err = network.Send(conn, resp);
     if err != nil {
