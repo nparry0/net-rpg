@@ -8,6 +8,8 @@ import (
 
 var MIN_CLIENT_VERSION int = 1
 
+var gWorld World;
+
 /* Each client gets one of these threads to listen to it, send data to it, 
    and handle validation for the life of the client */
 func clientConnThread(conn *network.GameConn) {
@@ -32,8 +34,7 @@ func clientConnThread(conn *network.GameConn) {
         log.Printf("Attempt to log in with old client version %d (min version is %d)\n", req.LoginReq.Version, MIN_CLIENT_VERSION)
         resp.Resp.Message = "Your client version is too old for this server.  Please update to the latest version."
         break;
-      }
-      if user != nil {
+      } else if user != nil {
         log.Printf("Multiple login attempts from %s\n", req.LoginReq.Username)
         resp.Resp.Message = "ERROR: Duplicate login attempt."
         break;
@@ -58,6 +59,11 @@ func clientConnThread(conn *network.GameConn) {
         log.Printf("Attempted to assume %s without logging in\n", req.AssumeActorReq.Actor)
         resp.Resp.Message = "You must log in first"
         break;
+      } else if actor != nil {
+        //TODO: Allow user to switch players
+        log.Printf("User %s attempted to assume a second actor %s\n", user.Username,req.AssumeActorReq.Actor)
+        resp.Resp.Message = "You cannot play two characters at once."
+        break;
       }
 
       actor, err = assumeActor(req.AssumeActorReq.Actor, user)
@@ -67,7 +73,8 @@ func clientConnThread(conn *network.GameConn) {
         break;
       } 
 
-      // Successfully logged in
+      // Successfully assumed an actor.  Set up a pipe with the room, add the new actor to the global list,
+      // drop that actor in a room, and send the client a success message along with their first room update
       log.Printf("User %s successfully assumed actor %s\n", user.Username, req.AssumeActorReq.Actor)
       resp.Resp.Message = "Successfully assumed character " + actor.Name
       resp.Resp.Success = true;
@@ -88,6 +95,14 @@ func clientConnThread(conn *network.GameConn) {
 
 func main() {
   log.SetFlags(log.Lshortfile)
+
+  log.Printf("Initializing world\n"); 
+  gWorld, err := initWorld()
+  if err != nil {
+    log.Printf("FAILED\n"); 
+    log.Panic(err)
+  }
+  log.Printf("Done %v\n", gWorld.Regions["Test Chambers"]); 
 
   ln, err := network.Listen("")
   if err != nil {

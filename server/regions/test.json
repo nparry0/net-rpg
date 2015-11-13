@@ -1,0 +1,29 @@
+{
+  "Name":"Test Chambers",
+  "Rows":[
+    [
+      {
+        "Name":"NW Test Room",
+        "Desc":"Sterile, bland room with boring, off-white paint job and tile flooring.  You feel like a lab rat in here.  There is a small, rusty metal desk with an old office chair here.  On the desk is a disorganized pile of paper forms, with unsharpened pencils littered about.  Whoever occupies this work area could use a change of career.",
+        "South": true, "East": true
+      },
+      {
+        "Name":"NE Test Room",
+        "Desc":"Sterile, bland room with boring, off-white paint job and tile flooring.  You feel like a lab rat in here.",
+        "South": true, "West": true
+      }
+    ],
+    [
+      {
+        "Name":"SW Test Room",
+        "Desc":"Sterile, bland room with boring, off-white paint job and tile flooring.  You feel like a lab rat in here.",
+        "North ": true, "East": true
+      },
+      {
+        "Name":"SE Test Room",
+        "Desc":"Sterile, bland room with boring, off-white paint job and tile flooring.  You feel like a lab rat in here.  There is a small window looking outside, but it is gray and cloudy.",
+        "North ": true, "West": true
+      }
+    ]
+  ]
+}
