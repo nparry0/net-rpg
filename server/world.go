@@ -5,6 +5,7 @@ import (
   "encoding/json"
   "io/ioutil"
   "path/filepath"
+  "github.com/nparry0/network"
 )
 
 // TODO: Make some of these (and other) structs' members private
@@ -28,13 +29,25 @@ type Room struct {
   South bool
   East bool
   West bool
+
+  // Send commands to the room
+  CmdChanRead <-chan network.GameMsg
+  CmdChanWrite chan<- network.GameMsg
+
+  // Get updates from the room
+  UpdateChanRead <-chan network.GameMsg
+  UpdateChanWrite chan<- network.GameMsg
+}
+
+func roomHandler(room *Room)(){
+    log.Printf("Starting handler for room %s\n", room.Name)
 }
 
 func initWorld()(*World, error){
   var world World
   var region Region
 
-  mapFiles, err := ioutil.ReadDir("./regions/")
+  regionFiles, err := ioutil.ReadDir("./regions/")
   if err != nil {
     log.Printf("Could not read maps dir\n")
     return nil, err
@@ -43,7 +56,8 @@ func initWorld()(*World, error){
   world.Pcs = make(map[string]*Actor);
   world.Regions = make(map[string]*Region);
 
-  for _, f := range mapFiles {
+  // Load every region file in the regions folder
+  for _, f := range regionFiles{
     if filepath.Ext(f.Name()) != ".json" {
       continue;
     }
@@ -62,6 +76,17 @@ func initWorld()(*World, error){
       return nil, err
     }
 
+    // Create a room handler goroutine and pipes to talk to and from each room
+    for _, h := range region.Rows {
+      for _, room := range h {
+        //log.Printf(room);
+        room.CmdChanWrite, room.CmdChanRead = network.NewPipe()
+        room.UpdateChanWrite, room.UpdateChanRead = network.NewPipe()
+        go roomHandler(room)
+      }
+    }
+    
+    
     world.Regions[region.Name] = &region;
   }
   return &world, nil;
