@@ -91,7 +91,7 @@ func Connect(server string)(*GameConn, error){
 
   //TODO: Name Resolution
   if server == "" {
-    server = ":10101"
+    server = "127.0.0.1:10101"
   }
 
   //TODO: Actual hostname and a real cert
