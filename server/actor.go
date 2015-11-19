@@ -14,9 +14,7 @@ type Actor struct {
   Intelligence int
   Defense int
   Evasion int
-  Region string
-  RegionRow int
-  RegionCol int
+  Coords RoomCoords
 }
 
 func assumeActor(actorName string, user *User)(*Actor, error) {

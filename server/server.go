@@ -5,14 +5,15 @@ import (
   "github.com/nparry0/network"
 )
 
-var gWorld World;
+var gWorld *World
 var gClients []*ClientConn
 
 func main() {
+  var err error
   log.SetFlags(log.Lshortfile)
 
   log.Printf("Initializing world\n"); 
-  gWorld, err := initWorld()
+  gWorld, err = NewWorld()
   if err != nil {
     log.Printf("FAILED\n"); 
     log.Panic(err)

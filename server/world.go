@@ -8,16 +8,12 @@ import (
   "github.com/nparry0/network"
 )
 
-// TODO: Make some of these (and other) structs' members private
-type World struct {
-  Pcs map[string]*Actor // PCs are globally unique
-  Regions map[string]*Region
-} 
-
-type Region struct {
-  Name string
-  Rows [][]*Room
-} 
+/***** Room *****/
+type RoomCoords struct {
+  Region string
+  Row int
+  Col int
+}
 
 type Room struct {
   Name string
@@ -43,7 +39,77 @@ func roomHandler(room *Room)(){
     log.Printf("Starting handler for room %s\n", room.Name)
 }
 
-func initWorld()(*World, error){
+
+/***** Region *****/
+type Region struct {
+  Name string
+  Rows [][]*Room
+} 
+
+
+/***** World *****/
+const (
+  NoDirection int = iota
+  North 
+  South 
+  East
+  West
+  Northeast
+  Northwest
+  Southeast
+  Southwest
+  Up
+  Down
+)
+
+type RoomFetcherMsg struct {
+  Direction int  
+  RoomCoords *RoomCoords
+  Room *Room
+}
+
+type World struct {
+  Pcs map[string]*Actor // PCs are globally unique
+  Regions map[string]*Region
+  RoomFetcherInChan chan RoomFetcherMsg // Ask for info about rooms
+  RoomFetcherOutChan chan RoomFetcherMsg // Ask for info about rooms
+} 
+
+// Fetches channels for a room given where you are and where you want to go.
+// This allows a client conn to ask to change rooms
+func (world World) roomFetcher() {
+    var msg RoomFetcherMsg
+
+    log.Printf("Started room fetcher\n")
+
+    for {
+      msg = <-world.RoomFetcherInChan
+      // TODO: tons more validation in this switch
+      switch msg.Direction {
+      case NoDirection:
+        msg.Room = world.Regions[msg.RoomCoords.Region].Rows[msg.RoomCoords.Row][msg.RoomCoords.Row]
+      case North:
+        msg.RoomCoords.Row -= 1;
+        msg.Room = world.Regions[msg.RoomCoords.Region].Rows[msg.RoomCoords.Row][msg.RoomCoords.Row]
+      case South:
+        msg.RoomCoords.Row += 1;
+        msg.Room = world.Regions[msg.RoomCoords.Region].Rows[msg.RoomCoords.Row][msg.RoomCoords.Row]
+      case East:
+        msg.RoomCoords.Col += 1;
+        msg.Room = world.Regions[msg.RoomCoords.Region].Rows[msg.RoomCoords.Row][msg.RoomCoords.Row]
+      case West:
+        msg.RoomCoords.Col -= 1;
+        msg.Room = world.Regions[msg.RoomCoords.Region].Rows[msg.RoomCoords.Row][msg.RoomCoords.Row]
+      default:
+        log.Printf("Unrecognized direction (%d)\n", msg.Direction)
+        msg.Room = nil
+        msg.RoomCoords = nil
+      }
+      world.RoomFetcherOutChan <- msg
+    }
+}
+
+func NewWorld()(*World, error){
   var world World
   var region Region
 
@@ -86,8 +152,11 @@ func initWorld()(*World, error){
       }
     }
     
-    
     world.Regions[region.Name] = &region;
+    world.RoomFetcherInChan = make(chan RoomFetcherMsg, 1)
+    world.RoomFetcherOutChan = make(chan RoomFetcherMsg, 1)
+    go world.roomFetcher()
   }
+
   return &world, nil;
 }

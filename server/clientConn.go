@@ -93,6 +93,11 @@ func (client ClientConn) clientReceiver() {
 
       // Successfully assumed an actor.  Set up a pipe with the room, add the new actor to the global list,
       // drop that actor in a room, and send the client a success message along with their first room update
+      gWorld.RoomFetcherInChan <- RoomFetcherMsg{Direction:NoDirection, RoomCoords:&client.actor.Coords}
+      fetcherMsg := <- gWorld.RoomFetcherOutChan;
+
+      log.Printf("DEBUG: client conn fetcher msg: %v\n", fetcherMsg)
+
       log.Printf("User %s successfully assumed actor %s\n", client.user.Username, req.AssumeActorReq.Actor)
       resp.Resp.Message = "Successfully assumed character " + client.actor.Name
       resp.Resp.Success = true;
