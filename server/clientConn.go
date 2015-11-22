@@ -9,6 +9,7 @@ import (
 type ClientConn struct {
   user *User;  
   actor *Actor;  
+  room *Room;
   GameConn *network.GameConn // TODO: maybe split the send and recieve parts here, for better exclusive access?
 
   RoomChan <-chan network.GameMsg       // Read room updates
@@ -91,16 +92,21 @@ func (client ClientConn) clientReceiver() {
         break;
       } 
 
-      // Successfully assumed an actor.  Set up a pipe with the room, add the new actor to the global list,
-      // drop that actor in a room, and send the client a success message along with their first room update
+      // Successfully assumed an actor.  Get our room's channels and ask the room to add us.
       gWorld.RoomFetcherInChan <- RoomFetcherMsg{Direction:NoDirection, RoomCoords:&client.actor.Coords}
       fetcherMsg := <- gWorld.RoomFetcherOutChan;
 
-      log.Printf("DEBUG: client conn fetcher msg: %v\n", fetcherMsg)
+      client.room = fetcherMsg.Room
+      client.room.CmdChanWriteSync <- RoomHandlerCmd{Actor:client.actor, Cmd:"add"}
+      resp.Resp.Success = <-client.room.CmdChanReadSync
 
-      log.Printf("User %s successfully assumed actor %s\n", client.user.Username, req.AssumeActorReq.Actor)
-      resp.Resp.Message = "Successfully assumed character " + client.actor.Name
-      resp.Resp.Success = true;
+      if ( resp.Resp.Success ) {
+        log.Printf("User %s successfully assumed actor %s\n", client.user.Username, req.AssumeActorReq.Actor)
+        resp.Resp.Message = "Successfully assumed character " + client.actor.Name
+      } else {
+        log.Printf("User %s failed to enter room with %s\n", client.user.Username, req.AssumeActorReq.Actor)
+        resp.Resp.Message = "Failed to enter room"
+      }
 
     default:
       log.Printf("Recv'd invalid type: %d\n", msgType)

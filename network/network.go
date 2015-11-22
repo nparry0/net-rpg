@@ -6,6 +6,7 @@ import (
   "encoding/json"
   "crypto/tls"
   "crypto/rand"
+  "errors"
 )
 
 /*********************/
@@ -35,10 +36,29 @@ type AssumeActorReq struct {
   Actor string
 }
 
+type CmdReq struct {
+  Actor string
+  Cmd string
+  Args []string
+}
+
+type RoomUpdate struct {
+  Name string
+  Desc string
+  Pcs []string
+  Npcs []string
+  North bool
+  South bool
+  East bool
+  West bool
+}
+
 type GameMsg struct {
   Resp *Resp
   LoginReq *LoginReq
   AssumeActorReq *AssumeActorReq
+  CmdReq *CmdReq
+  RoomUpdate *RoomUpdate
 }
 
 /*************************/
@@ -48,6 +68,23 @@ type GameConn struct {
   conn net.Conn
   dec * json.Decoder
   enc * json.Encoder
+}
+
+func GetGameMsgType(msg *GameMsg)(int, error){
+  var respType int
+
+  if msg.Resp != nil {
+    respType = TypeResp
+  } else if msg.LoginReq != nil {
+    respType = TypeLoginReq
+  } else if msg.AssumeActorReq != nil {
+    respType = TypeAssumeActorReq
+  } else if msg.CmdReq != nil {
+    respType = TypeCmd
+  } else {
+    return TypeError, errors.New("Invalid Game Message")
+  }
+  return respType, nil
 }
 
 func Listen(port string)(net.Listener, error){
@@ -114,21 +151,15 @@ func Send(conn *GameConn, req interface{})(error) {
 
 func Recv(conn *GameConn)(*GameMsg, int, error) {
   var resp GameMsg
-  var respType int
 
   err := conn.dec.Decode(&resp)
   if err != nil {
     return nil, TypeError, err
   }
 
-  if resp.Resp != nil {
-    respType = TypeResp
-  } else if resp.LoginReq != nil {
-    respType = TypeLoginReq
-  } else if resp.AssumeActorReq != nil {
-    respType = TypeAssumeActorReq
-  } else {
-    respType = TypeCmd
+  respType, err := GetGameMsgType(&resp)
+  if err != nil {
+    return nil, TypeError, err
   }
 
   return &resp, respType, nil;

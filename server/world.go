@@ -26,17 +26,45 @@ type Room struct {
   East bool
   West bool
 
-  // Send commands to the room
-  CmdChanRead <-chan network.GameMsg
-  CmdChanWrite chan<- network.GameMsg
+  // Send commands to the room asynchronously (with a pipe)
+  CmdChanReadAsync <-chan network.GameMsg
+  CmdChanWriteAsync chan<- network.GameMsg
+
+  // Send commands to the room synchronously (just normal channel)
+  CmdChanWriteSync chan RoomHandlerCmd
+  CmdChanReadSync chan bool
 
   // Get updates from the room
   UpdateChanRead <-chan network.GameMsg
   UpdateChanWrite chan<- network.GameMsg
 }
 
+// Similar to CmdReq in the GameMsg, but with more info
+type RoomHandlerCmd struct {
+  Actor *Actor
+  Cmd string
+  Args []string
+}
+
 func roomHandler(room *Room)(){
-    log.Printf("Starting handler for room %s\n", room.Name)
+  log.Printf("Starting handler for room %s\n", room.Name)
+
+  for {
+    ret := true
+    cmd := <-room.CmdChanWriteSync
+
+    ret = true
+    switch cmd.Cmd {
+      case "add":
+        log.Printf("Received an add command from %s\n", cmd.Actor.Name)
+        room.Pcs[cmd.Actor.Name] = cmd.Actor
+      default:
+        log.Printf("Invalid game message command\n")
+        ret = false
+    }
+    
+    room.CmdChanReadSync <- ret
+  }
 }
 
 
@@ -146,8 +174,11 @@ func NewWorld()(*World, error){
     for _, h := range region.Rows {
       for _, room := range h {
         //log.Printf(room);
-        room.CmdChanWrite, room.CmdChanRead = network.NewPipe()
+        room.Pcs = make(map[string]*Actor);
+        room.CmdChanWriteAsync, room.CmdChanReadAsync = network.NewPipe()
         room.UpdateChanWrite, room.UpdateChanRead = network.NewPipe()
+        room.CmdChanWriteSync = make(chan RoomHandlerCmd)
+        room.CmdChanReadSync = make(chan bool)
         go roomHandler(room)
       }
     }
