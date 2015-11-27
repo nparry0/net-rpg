@@ -18,6 +18,7 @@ const (
   TypeLoginReq
   TypeAssumeActorReq
   TypeCmd
+  TypeRoomUpdate
 )
 
 type Resp struct {
@@ -81,6 +82,8 @@ func GetGameMsgType(msg *GameMsg)(int, error){
     respType = TypeAssumeActorReq
   } else if msg.CmdReq != nil {
     respType = TypeCmd
+  } else if msg.RoomUpdate != nil {
+    respType = TypeRoomUpdate
   } else {
     return TypeError, errors.New("Invalid Game Message")
   }

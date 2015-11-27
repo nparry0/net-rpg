@@ -63,17 +63,57 @@ func main() {
   if err != nil {
     log.Fatal(err)
   }
-  resp, msgType, err = network.Recv(conn);
+
+
+  go recvUpdates(conn);
+
+  for {
+    fmt.Printf("[%s]$", character)
+    fmt.Scanln(&pass)
+  }
+  
+}
+
+func recvUpdates(conn *network.GameConn) {
+  resp, msgType, err := network.Recv(conn);
   if err != nil {
     log.Fatal(err)
   }
 
-  // Did we log in successfully?
-  if msgType == network.TypeResp && resp.Resp.Success == true {
-    fmt.Printf("Successfully selected character :)\n");
-  } else {
-    fmt.Printf("Could not select character :(\n");
-    fmt.Printf("Server says: %s\n", resp.Resp.Message)
+  if msgType == network.TypeRoomUpdate {
+
+type RoomUpdate struct {
+  Name string
+  Desc string
+  Pcs []string
+  Npcs []string
+  North bool
+  South bool
+  East bool
+  West bool
+}
+    fmt.Printf("%s\n%s\n\nDirections: ", resp.RoomUpdate.Name, resp.RoomUpdate.Desc)
+    if resp.RoomUpdate.North {
+      fmt.Printf("North ");
+    }
+    if resp.RoomUpdate.East {
+      fmt.Printf("East ");
+    }
+    if resp.RoomUpdate.South {
+      fmt.Printf("South ");
+    }
+    if resp.RoomUpdate.West {
+      fmt.Printf("West");
+    }
+    for _, pc := range resp.RoomUpdate.Pcs {
+      fmt.Printf("%s\n", pc);
+    }
+    for _, npc := range resp.RoomUpdate.Npcs {
+      fmt.Printf("%s\n", npc);
+    }
+
+  } else if msgType == network.TypeResp && !resp.Resp.Success {
+    fmt.Printf("Error, server says: %s\n", resp.Resp.Message)
     os.Exit(1);
   }
 }

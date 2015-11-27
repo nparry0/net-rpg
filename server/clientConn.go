@@ -97,7 +97,7 @@ func (client ClientConn) clientReceiver() {
       fetcherMsg := <- gWorld.RoomFetcherOutChan;
 
       client.room = fetcherMsg.Room
-      client.room.CmdChanWriteSync <- RoomHandlerCmd{Actor:client.actor, Cmd:"add"}
+      client.room.CmdChanWriteSync <- RoomHandlerCmd{Actor:client.actor, Cmd:"add", UpdateChan:client.SendChanWrite}
       resp.Resp.Success = <-client.room.CmdChanReadSync
 
       if ( resp.Resp.Success ) {
