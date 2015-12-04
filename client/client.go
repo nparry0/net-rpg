@@ -5,7 +5,9 @@ import (
   "fmt"
   "github.com/nparry0/network"
   "os"
-  ui "github.com/gizak/termui"
+  //ui "github.com/gizak/termui"
+  ui "gopkg.in/gizak/termui.v1"
+  //"strconv"
 )
 
 func main() {
@@ -80,9 +82,9 @@ func recvUpdates(conn *network.GameConn) {
     }
 
     if msgType == network.TypeRoomUpdate {
-      fmt.Printf("Room update! %v\n", resp.RoomUpdate)
+      //fmt.Printf("Room update! %v\n", resp.RoomUpdate)
     } else if msgType == network.TypeResp && !resp.Resp.Success {
-      fmt.Printf("Error, server says: %s\n", resp.Resp.Message)
+      //fmt.Printf("Error, server says: %s\n", resp.Resp.Message)
       os.Exit(1);
     }
   }
@@ -102,8 +104,8 @@ func startUI() {
   descPar.Height = (height-3)/2
   //descPar.Width = 50
   descPar.TextFgColor = ui.ColorWhite
-  descPar.BorderLabel = "Description"
-  descPar.BorderFg = ui.ColorCyan
+  descPar.Border.Label = "Description"
+  descPar.Border.FgColor = ui.ColorCyan
 
   strs := []string{
     "You",
@@ -114,7 +116,7 @@ func startUI() {
   entityList := ui.NewList()
   entityList.Items = strs
   entityList.ItemFgColor = ui.ColorYellow
-  entityList.BorderLabel = "List"
+  entityList.Border.Label = "List"
   entityList.Height = (height-3)/2
   //entityList.Width = 25
   entityList.Y = 0
@@ -123,15 +125,15 @@ func startUI() {
   activityPar.Height = (height-3)/2
   //activityPar.Width = 50
   activityPar.TextFgColor = ui.ColorWhite
-  activityPar.BorderLabel = "Activity"
-  activityPar.BorderFg = ui.ColorCyan
+  activityPar.Border.Label = "Activity"
+  activityPar.Border.FgColor = ui.ColorCyan
 
   cmdPar := ui.NewPar("")
   cmdPar.Height = 3
   //cmdPar.Width = 50
   cmdPar.TextFgColor = ui.ColorWhite
-  cmdPar.BorderLabel = "Enter Command"
-  cmdPar.BorderFg = ui.ColorCyan
+  cmdPar.Border.Label = "Enter Command"
+  cmdPar.Border.FgColor = ui.ColorCyan
 
 
   // build
@@ -148,48 +150,61 @@ func startUI() {
 
   ui.Render(ui.Body)
 
-  ui.Handle("/sys/kbd/C-c", func(ui.Event) {
-    ui.StopLoop()
-  })
-  ui.Handle("/sys/kbd/<space>", func(e ui.Event) {
-    cmdPar.Text = cmdPar.Text + " "
-    ui.Render(ui.Body)
-  })
-  ui.Handle("/sys/kbd/<enter>", func(e ui.Event) {
-    cmdPar.Text = ""
-    ui.Render(ui.Body)
-  })
-  ui.Handle("/sys/kbd/C-8", func(e ui.Event) {
-    cmdPar.Text = cmdPar.Text[:len(cmdPar.Text)-1]
-    ui.Render(ui.Body)
-  })
-  ui.Handle("/sys/kbd", func(e ui.Event) {
-    // handle all other key pressing
-    k := e.Data.(ui.EvtKbd)
-    cmdPar.Text = cmdPar.Text + k.KeyStr  
-/*
-    switch k.KeyStr{
-      case "<space>":
-        cmdPar.Text = cmdPar.Text + " "
-      default:
-        cmdPar.Text = cmdPar.Text + k.KeyStr  
+  evt := ui.EventCh()
+  redraw := make(chan bool)
+  done := make(chan bool)
+
+  for {
+    select {
+    case e := <-evt:
+      switch e.Type {
+      case ui.EventKey:
+        switch e.Ch {
+        case 0: // e.Key is valid if e.Ch is 0
+          switch e.Key {
+          case ui.KeyBackspace2:
+            fallthrough
+          case ui.KeyBackspace:
+            len := len(cmdPar.Text)
+            if len > 0 {
+              cmdPar.Text = cmdPar.Text[:len-1] 
+              go func() { redraw <- true }()
+            }
+          case ui.KeySpace:
+            cmdPar.Text += " "
+            go func() { redraw <- true }()
+          case ui.KeyEsc:
+            fallthrough
+          case ui.KeyCtrlC:
+            return
+          case ui.KeyEnter:
+            cmdPar.Text = ""
+            go func() { redraw <- true }()
+            //TODO: execute command here
+          //default:
+          //  cmdPar.Text += strconv.Itoa(int(e.Key))
+          //  go func() { redraw <- true }()
+          }
+        default:
+          cmdPar.Text += string(e.Ch)
+          go func() { redraw <- true }()
+        }
+      case ui.EventResize:
+        height := ui.TermHeight()
+        descPar.Height = (height-3)/2
+        entityList.Height = (height-3)/2
+        activityPar.Height = (height-3)/2
+
+        ui.Body.Width = ui.TermWidth()
+        ui.Body.Align()
+        go func() { redraw <- true }()
+      }
+    case <-done:
+      return
+    case <-redraw:
+      ui.Render(ui.Body)
     }
-*/
-
-    ui.Render(ui.Body)
-  })
-  ui.Handle("/sys/wnd/resize", func(e ui.Event) {
-    height := ui.TermHeight()
-    descPar.Height = (height-3)/2
-    entityList.Height = (height-3)/2
-    activityPar.Height = (height-3)/2
-
-    ui.Body.Width = ui.TermWidth()
-    ui.Body.Align()
-    ui.Render(ui.Body)
-  })
-
-  ui.Loop()
+  }
 
   /*
   fmt.Printf("%s\n%s\n\nDirections: ", resp.RoomUpdate.Name, resp.RoomUpdate.Desc)
