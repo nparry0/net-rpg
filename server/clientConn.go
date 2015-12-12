@@ -108,6 +108,19 @@ func (client ClientConn) clientReceiver() {
         resp.Resp.Message = "Failed to enter room"
       }
 
+    // Command
+    case network.TypeCmdReq:
+      // Validate that it is a supported command, no sense in clogging up the room handler if it's not
+      switch req.CmdReq.Cmd {
+        case "say":
+          resp.Resp.Success = true;
+        default:
+          // Don't log to server logs every time someone mistypes a command
+          resp.Resp.Message = "Invalid command" 
+      }
+      req.CmdReq.Actor = client.actor.Name
+      client.room.CmdChanWriteAsync <- *req
+
     default:
       log.Printf("Recv'd invalid type: %d\n", msgType)
       resp.Resp.Message = "ERROR: Invalid message type (" + strconv.Itoa(msgType) + ")."

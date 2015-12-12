@@ -17,7 +17,7 @@ const (
   TypeResp
   TypeLoginReq
   TypeAssumeActorReq
-  TypeCmd
+  TypeCmdReq
   TypeRoomUpdate
 )
 
@@ -40,7 +40,7 @@ type AssumeActorReq struct {
 type CmdReq struct {
   Actor string
   Cmd string
-  Args []string
+  Arg1 string
 }
 
 type RoomUpdate struct {
@@ -52,6 +52,7 @@ type RoomUpdate struct {
   South bool
   East bool
   West bool
+  Message string
 }
 
 type GameMsg struct {
@@ -81,7 +82,7 @@ func GetGameMsgType(msg *GameMsg)(int, error){
   } else if msg.AssumeActorReq != nil {
     respType = TypeAssumeActorReq
   } else if msg.CmdReq != nil {
-    respType = TypeCmd
+    respType = TypeCmdReq
   } else if msg.RoomUpdate != nil {
     respType = TypeRoomUpdate
   } else {

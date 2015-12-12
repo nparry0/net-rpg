@@ -38,14 +38,15 @@ type Room struct {
 }
 
 // Similar to CmdReq in the GameMsg, but with more info
+// Sent in the synchronous chan, but GameMsgs are sent in the async
 type RoomHandlerCmd struct {
   Actor *Actor
   Cmd string
-  Args []string
+  Arg1 string
   UpdateChan chan<- network.GameMsg
 }
 
-func (room *Room)createRoomUpdate()(network.GameMsg){
+func (room *Room)createRoomUpdate(msg string)(network.GameMsg){
   pcs := make([]string, len(room.Pcs))
 
   i := 0
@@ -62,7 +63,8 @@ func (room *Room)createRoomUpdate()(network.GameMsg){
     North:room.North,
     South:room.South,
     East:room.East,
-    West:room.West}}
+    West:room.West,
+    Message:msg}}
   return update;
 }
 
@@ -70,24 +72,35 @@ func roomHandler(room *Room)(){
   log.Printf("Starting handler for room %s\n", room.Name)
 
   for {
-    ret := true
-    cmd := <-room.CmdChanWriteSync
+    msg := ""
+    select {
+      // Sync commands.  Things like adding/removing from a room
+      case cmd := <-room.CmdChanWriteSync:
+        ret := true
+        switch cmd.Cmd {
+          case "add":
+            log.Printf("Received an add command from %s\n", cmd.Actor.Name)
+            room.Pcs[cmd.Actor.Name] = cmd.Actor
+            room.UpdateChans[cmd.Actor.Name] = cmd.UpdateChan
+          default:
+            log.Printf("Invalid sync game message command %s\n", cmd.Cmd)
+            ret = false
+        }
+        
+        room.CmdChanReadSync <- ret
 
-    ret = true
-    switch cmd.Cmd {
-      case "add":
-        log.Printf("Received an add command from %s\n", cmd.Actor.Name)
-        room.Pcs[cmd.Actor.Name] = cmd.Actor
-        room.UpdateChans[cmd.Actor.Name] = cmd.UpdateChan
-      default:
-        log.Printf("Invalid game message command\n")
-        ret = false
+      // Async commands.  Basically everything that occurs within the room and doesn't require immediate feedback.
+      case cmd := <-room.CmdChanReadAsync:
+        switch cmd.CmdReq.Cmd {
+          case "say":
+            msg = cmd.CmdReq.Actor + " says \"" + cmd.CmdReq.Arg1 + "\""
+          default:
+            log.Printf("Invalid async game message command\n")
+        }
     }
-    
-    room.CmdChanReadSync <- ret
 
-    // Now, create a room update and send it to everyone in the room
-    update := room.createRoomUpdate();
+    // Something happened.  Create a room update and send it to everyone in the room
+    update := room.createRoomUpdate(msg);
     for _, u := range room.UpdateChans {
       u <- update;
     }

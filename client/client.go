@@ -8,6 +8,8 @@ import (
   //ui "github.com/gizak/termui"
   ui "gopkg.in/gizak/termui.v1"
   //"strconv"
+  "strings"
+  "errors"
 )
 
 func main() {
@@ -67,14 +69,29 @@ func main() {
     log.Fatal(err)
   }
 
-  // Kick off the go routine to handle getting room updates
-  go recvUpdates(conn);
+  update := make(chan *network.RoomUpdate)
+	sendChanWrite, sendChanRead := network.NewPipe()
+
+  go sendCmds(conn, sendChanRead);
+  go recvUpdates(conn, update);
   
   // Set up the UI
-  startUI();
+  // TODO: make this whole deal an object, add character to it as a member 
+  startUI(update, sendChanWrite, character);
 }
 
-func recvUpdates(conn *network.GameConn) {
+func sendCmds(conn *network.GameConn, cmd <-chan network.GameMsg) {
+  for {
+    msg := <-cmd
+    err := network.Send(conn, msg)
+    if err != nil {
+      log.Print(err)
+      return
+    }
+  }
+}
+
+func recvUpdates(conn *network.GameConn, update chan *network.RoomUpdate) {
   for {
     resp, msgType, err := network.Recv(conn);
     if err != nil {
@@ -82,7 +99,7 @@ func recvUpdates(conn *network.GameConn) {
     }
 
     if msgType == network.TypeRoomUpdate {
-      //fmt.Printf("Room update! %v\n", resp.RoomUpdate)
+      update <- resp.RoomUpdate
     } else if msgType == network.TypeResp && !resp.Resp.Success {
       //fmt.Printf("Error, server says: %s\n", resp.Resp.Message)
       os.Exit(1);
@@ -90,7 +107,7 @@ func recvUpdates(conn *network.GameConn) {
   }
 }
 
-func startUI() {
+func startUI(update chan *network.RoomUpdate, cmd chan<- network.GameMsg, character string) {
   err := ui.Init()
   if err != nil {
     panic(err)
@@ -100,33 +117,24 @@ func startUI() {
   //ui.UseTheme("helloworld")
   height := ui.TermHeight()
 
-  descPar := ui.NewPar("This is a room description")
+  descPar := ui.NewPar("")
   descPar.Height = (height-3)/2
   //descPar.Width = 50
   descPar.TextFgColor = ui.ColorWhite
-  descPar.Border.Label = "Description"
+  descPar.Border.Label = ""
   descPar.Border.FgColor = ui.ColorCyan
 
-  strs := []string{
-    "You",
-    "NPC 1",
-    "NPC 2",
-  }
-
   entityList := ui.NewList()
-  entityList.Items = strs
   entityList.ItemFgColor = ui.ColorYellow
-  entityList.Border.Label = "List"
+  entityList.Border.Label = "Entities"
   entityList.Height = (height-3)/2
-  //entityList.Width = 25
   entityList.Y = 0
 
-  activityPar := ui.NewPar("Something happened\nSomething else happened")
-  activityPar.Height = (height-3)/2
-  //activityPar.Width = 50
-  activityPar.TextFgColor = ui.ColorWhite
-  activityPar.Border.Label = "Activity"
-  activityPar.Border.FgColor = ui.ColorCyan
+  activityList := ui.NewList()
+  activityList.ItemFgColor = ui.ColorWhite
+  activityList.Border.Label = "Activity"
+  activityList.Height = (height-3)/2
+  activityList.Y = 0
 
   cmdPar := ui.NewPar("")
   cmdPar.Height = 3
@@ -142,7 +150,7 @@ func startUI() {
       ui.NewCol(4, 0, entityList),
       ui.NewCol(8, 0, descPar)),
     ui.NewRow(
-      ui.NewCol(12, 0, activityPar)),
+      ui.NewCol(12, 0, activityList)),
     ui.NewRow(
       ui.NewCol(12, 0, cmdPar)))
 
@@ -156,6 +164,7 @@ func startUI() {
 
   for {
     select {
+    // Get an event from the keyboard, mouse, screen resize, etc
     case e := <-evt:
       switch e.Type {
       case ui.EventKey:
@@ -178,9 +187,14 @@ func startUI() {
           case ui.KeyCtrlC:
             return
           case ui.KeyEnter:
+            msg, err := parseCmd(cmdPar.Text)
+            if err != nil {
+              //TODO: alert the user somehow
+              break
+            }
+            cmd <- msg
             cmdPar.Text = ""
             go func() { redraw <- true }()
-            //TODO: execute command here
           //default:
           //  cmdPar.Text += strconv.Itoa(int(e.Key))
           //  go func() { redraw <- true }()
@@ -193,38 +207,47 @@ func startUI() {
         height := ui.TermHeight()
         descPar.Height = (height-3)/2
         entityList.Height = (height-3)/2
-        activityPar.Height = (height-3)/2
+        activityList.Height = (height-3)/2
 
         ui.Body.Width = ui.TermWidth()
         ui.Body.Align()
         go func() { redraw <- true }()
       }
-    case <-done:
-      return
+    // We got a room update from the server
+    case u := <-update:
+      var entities []string
+      for _,pc := range u.Pcs {
+        entities = append(entities, pc + " (PC)")
+      }
+      entities = append(entities, u.Npcs...)
+      entityList.Items = entities;
+
+      if u.Message != "" {
+        activityList.Items = append(activityList.Items, u.Message)
+      }
+
+      descPar.Text = u.Desc
+      descPar.Border.Label = u.Name
+      go func() { redraw <- true }()
+
+    // Request to redraw
     case <-redraw:
       ui.Render(ui.Body)
+    // We are done
+    case <-done:
+      return
     }
   }
+}
 
-  /*
-  fmt.Printf("%s\n%s\n\nDirections: ", resp.RoomUpdate.Name, resp.RoomUpdate.Desc)
-  if resp.RoomUpdate.North {
-    fmt.Printf("North ");
-  }
-  if resp.RoomUpdate.East {
-    fmt.Printf("East ");
-  }
-  if resp.RoomUpdate.South {
-    fmt.Printf("South ");
-  }
-  if resp.RoomUpdate.West {
-    fmt.Printf("West");
-  }
-  for _, pc := range resp.RoomUpdate.Pcs {
-    fmt.Printf("%s\n", pc);
-  }
-  for _, npc := range resp.RoomUpdate.Npcs {
-    fmt.Printf("%s\n", npc);
-  }
-  */
+func parseCmd(cmd string)(network.GameMsg, error) {
+    msg := network.GameMsg{CmdReq:&network.CmdReq{Cmd:""}}
+
+    words := strings.Fields(cmd)
+    if len(words) == 0 {
+      return msg, errors.New("Please type a command")
+    }
+    msg.CmdReq.Cmd = words[0]
+    msg.CmdReq.Arg1 = strings.Join(words[1:], " ")
+    return msg, nil
 }
