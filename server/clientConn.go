@@ -110,16 +110,56 @@ func (client ClientConn) clientReceiver() {
 
     // Command
     case network.TypeCmdReq:
+      // Assign actor
+      req.CmdReq.Actor = client.actor.Name
+
       // Validate that it is a supported command, no sense in clogging up the room handler if it's not
       switch req.CmdReq.Cmd {
         case "say":
           resp.Resp.Success = true;
+          client.room.CmdChanWriteAsync <- *req
+        case "go":
+          var dir int
+          resp.Resp.Success = true
+          switch req.CmdReq.Arg1 {
+            case "north":
+              dir = North
+            case "south":
+              dir = South
+            case "east":
+              dir = East
+            case "west":
+              dir = West
+            default:
+              resp.Resp.Success = false
+          }
+          if !resp.Resp.Success {
+            break
+          }
+          gWorld.RoomFetcherInChan <- RoomFetcherMsg{Direction:dir, RoomCoords:&client.actor.Coords}
+          fetcherMsg := <- gWorld.RoomFetcherOutChan;
+
+          client.room.CmdChanWriteSync <- RoomHandlerCmd{Actor:client.actor, Cmd:"rem", UpdateChan:client.SendChanWrite}
+          resp.Resp.Success = <-client.room.CmdChanReadSync
+
+          if !resp.Resp.Success {
+            break
+          }
+
+          fetcherMsg.Room.CmdChanWriteSync <- RoomHandlerCmd{Actor:client.actor, Cmd:"add", UpdateChan:client.SendChanWrite}
+          resp.Resp.Success = <-fetcherMsg.Room.CmdChanReadSync
+
+          if !resp.Resp.Success {
+            break
+          }
+
+          client.room = fetcherMsg.Room
+          resp.Resp.Success = true;
+
         default:
           // Don't log to server logs every time someone mistypes a command
           resp.Resp.Message = "Invalid command" 
       }
-      req.CmdReq.Actor = client.actor.Name
-      client.room.CmdChanWriteAsync <- *req
 
     default:
       log.Printf("Recv'd invalid type: %d\n", msgType)

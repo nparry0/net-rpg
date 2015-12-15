@@ -79,9 +79,11 @@ func roomHandler(room *Room)(){
         ret := true
         switch cmd.Cmd {
           case "add":
-            log.Printf("Received an add command from %s\n", cmd.Actor.Name)
             room.Pcs[cmd.Actor.Name] = cmd.Actor
             room.UpdateChans[cmd.Actor.Name] = cmd.UpdateChan
+          case "rem":
+            delete(room.Pcs, cmd.Actor.Name)
+            delete(room.UpdateChans, cmd.Actor.Name)
           default:
             log.Printf("Invalid sync game message command %s\n", cmd.Cmd)
             ret = false
@@ -156,19 +158,19 @@ func (world World) roomFetcher() {
       // TODO: tons more validation in this switch
       switch msg.Direction {
       case NoDirection:
-        msg.Room = world.Regions[msg.RoomCoords.Region].Rows[msg.RoomCoords.Row][msg.RoomCoords.Row]
+        msg.Room = world.Regions[msg.RoomCoords.Region].Rows[msg.RoomCoords.Row][msg.RoomCoords.Col]
       case North:
         msg.RoomCoords.Row -= 1;
-        msg.Room = world.Regions[msg.RoomCoords.Region].Rows[msg.RoomCoords.Row][msg.RoomCoords.Row]
+        msg.Room = world.Regions[msg.RoomCoords.Region].Rows[msg.RoomCoords.Row][msg.RoomCoords.Col]
       case South:
         msg.RoomCoords.Row += 1;
-        msg.Room = world.Regions[msg.RoomCoords.Region].Rows[msg.RoomCoords.Row][msg.RoomCoords.Row]
+        msg.Room = world.Regions[msg.RoomCoords.Region].Rows[msg.RoomCoords.Row][msg.RoomCoords.Col]
       case East:
         msg.RoomCoords.Col += 1;
-        msg.Room = world.Regions[msg.RoomCoords.Region].Rows[msg.RoomCoords.Row][msg.RoomCoords.Row]
+        msg.Room = world.Regions[msg.RoomCoords.Region].Rows[msg.RoomCoords.Row][msg.RoomCoords.Col]
       case West:
         msg.RoomCoords.Col -= 1;
-        msg.Room = world.Regions[msg.RoomCoords.Region].Rows[msg.RoomCoords.Row][msg.RoomCoords.Row]
+        msg.Room = world.Regions[msg.RoomCoords.Region].Rows[msg.RoomCoords.Row][msg.RoomCoords.Col]
       default:
         log.Printf("Unrecognized direction (%d)\n", msg.Direction)
         msg.Room = nil

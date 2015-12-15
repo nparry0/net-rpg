@@ -118,11 +118,19 @@ func startUI(update chan *network.RoomUpdate, cmd chan<- network.GameMsg, charac
   height := ui.TermHeight()
 
   descPar := ui.NewPar("")
-  descPar.Height = (height-3)/2
+  descPar.Height = ((height-3)/2) - 5
   //descPar.Width = 50
   descPar.TextFgColor = ui.ColorWhite
   descPar.Border.Label = ""
   descPar.Border.FgColor = ui.ColorCyan
+
+  exitPar := ui.NewPar("")
+  exitPar.Height = 5
+  exitPar.TextFgColor = ui.ColorWhite
+  exitPar.Border.Label = "Exits"
+  exitPar.Border.FgColor = ui.ColorCyan
+
+
 
   entityList := ui.NewList()
   entityList.ItemFgColor = ui.ColorYellow
@@ -148,7 +156,7 @@ func startUI(update chan *network.RoomUpdate, cmd chan<- network.GameMsg, charac
   ui.Body.AddRows(
     ui.NewRow(
       ui.NewCol(4, 0, entityList),
-      ui.NewCol(8, 0, descPar)),
+      ui.NewCol(8, 0, descPar, exitPar)),
     ui.NewRow(
       ui.NewCol(12, 0, activityList)),
     ui.NewRow(
@@ -205,7 +213,7 @@ func startUI(update chan *network.RoomUpdate, cmd chan<- network.GameMsg, charac
         }
       case ui.EventResize:
         height := ui.TermHeight()
-        descPar.Height = (height-3)/2
+        descPar.Height = ((height-3)/2) - 5
         entityList.Height = (height-3)/2
         activityList.Height = (height-3)/2
 
@@ -226,8 +234,31 @@ func startUI(update chan *network.RoomUpdate, cmd chan<- network.GameMsg, charac
         activityList.Items = append(activityList.Items, u.Message)
       }
 
+      exitStr := ""
+      if u.North {
+        exitStr += "       ^ North\n"
+      } else {
+        exitStr += "\n"
+      }
+      if u.West{
+        exitStr += "West <  "
+      } else {
+        exitStr += "      "
+      }
+      if u.East {
+        exitStr += "   > East \n"
+      } else {
+        exitStr += "          \n"
+      }
+      if u.South {
+        exitStr += "       v South"
+      }
+
+      exitPar.Text =  exitStr
+
       descPar.Text = u.Desc
       descPar.Border.Label = u.Name
+
       go func() { redraw <- true }()
 
     // Request to redraw
