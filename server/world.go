@@ -155,22 +155,50 @@ func (world World) roomFetcher() {
 
     for {
       msg = <-world.RoomFetcherInChan
-      // TODO: tons more validation in this switch
+
+      // Check that the room they are in now actually exists
+      region := world.Regions[msg.RoomCoords.Region]
+      if region == nil || 
+         msg.RoomCoords.Row < 0 || 
+         msg.RoomCoords.Row > len(region.Rows) || 
+         msg.RoomCoords.Col < 0 || 
+         msg.RoomCoords.Col > len(region.Rows[msg.RoomCoords.Row]) {
+        msg.Room = nil
+        msg.RoomCoords = nil
+        world.RoomFetcherOutChan <- msg
+        continue
+      }
+
+      // Check that the room we are going to exists 
       switch msg.Direction {
       case NoDirection:
-        msg.Room = world.Regions[msg.RoomCoords.Region].Rows[msg.RoomCoords.Row][msg.RoomCoords.Col]
+        msg.Room = region.Rows[msg.RoomCoords.Row][msg.RoomCoords.Col]
       case North:
         msg.RoomCoords.Row -= 1;
-        msg.Room = world.Regions[msg.RoomCoords.Region].Rows[msg.RoomCoords.Row][msg.RoomCoords.Col]
+        if  msg.RoomCoords.Row < 0 {
+          msg.RoomCoords.Row = 0;
+        }
+        msg.Room = region.Rows[msg.RoomCoords.Row][msg.RoomCoords.Col]
       case South:
         msg.RoomCoords.Row += 1;
-        msg.Room = world.Regions[msg.RoomCoords.Region].Rows[msg.RoomCoords.Row][msg.RoomCoords.Col]
+        len := len(region.Rows)
+        if  msg.RoomCoords.Row >= len {
+          msg.RoomCoords.Row = len-1;
+        }
+        msg.Room = region.Rows[msg.RoomCoords.Row][msg.RoomCoords.Col]
       case East:
         msg.RoomCoords.Col += 1;
-        msg.Room = world.Regions[msg.RoomCoords.Region].Rows[msg.RoomCoords.Row][msg.RoomCoords.Col]
+        len := len(region.Rows[msg.RoomCoords.Row])
+        if  msg.RoomCoords.Col >= len {
+          msg.RoomCoords.Col = len-1;
+        }
+        msg.Room = region.Rows[msg.RoomCoords.Row][msg.RoomCoords.Col]
       case West:
         msg.RoomCoords.Col -= 1;
-        msg.Room = world.Regions[msg.RoomCoords.Region].Rows[msg.RoomCoords.Row][msg.RoomCoords.Col]
+        if  msg.RoomCoords.Col < 0 {
+          msg.RoomCoords.Col = 0;
+        }
+        msg.Room = region.Rows[msg.RoomCoords.Row][msg.RoomCoords.Col]
       default:
         log.Printf("Unrecognized direction (%d)\n", msg.Direction)
         msg.Room = nil
