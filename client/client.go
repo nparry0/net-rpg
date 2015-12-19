@@ -70,14 +70,16 @@ func main() {
   }
 
   update := make(chan *network.RoomUpdate)
+  activity:= make(chan string)
+
 	sendChanWrite, sendChanRead := network.NewPipe()
 
-  go sendCmds(conn, sendChanRead);
-  go recvUpdates(conn, update);
+  go sendCmds(conn, sendChanRead)
+  go recvUpdates(conn, update, activity)
   
   // Set up the UI
-  // TODO: make this whole deal an object, add character to it as a member 
-  startUI(update, sendChanWrite, character);
+  // TODO: make this whole deal an object, add character and other stuff to it as a member 
+  startUI(update, activity, sendChanWrite, character)
 }
 
 func sendCmds(conn *network.GameConn, cmd <-chan network.GameMsg) {
@@ -91,7 +93,7 @@ func sendCmds(conn *network.GameConn, cmd <-chan network.GameMsg) {
   }
 }
 
-func recvUpdates(conn *network.GameConn, update chan *network.RoomUpdate) {
+func recvUpdates(conn *network.GameConn, update chan *network.RoomUpdate, activity chan string) {
   for {
     resp, msgType, err := network.Recv(conn);
     if err != nil {
@@ -100,14 +102,17 @@ func recvUpdates(conn *network.GameConn, update chan *network.RoomUpdate) {
 
     if msgType == network.TypeRoomUpdate {
       update <- resp.RoomUpdate
-    } else if msgType == network.TypeResp && !resp.Resp.Success {
-      //fmt.Printf("Error, server says: %s\n", resp.Resp.Message)
-      os.Exit(1);
+    } else if msgType == network.TypeResp {
+      if resp.Resp.Message != "" {
+        activity <- resp.Resp.Message
+      } else if !resp.Resp.Success {
+        activity <- "Invalid command (type 'help' and hit enter for assistance)"
+      }
     }
   }
 }
 
-func startUI(update chan *network.RoomUpdate, cmd chan<- network.GameMsg, character string) {
+func startUI(update chan *network.RoomUpdate, activity chan string, cmd chan<- network.GameMsg, character string) {
   err := ui.Init()
   if err != nil {
     panic(err)
@@ -170,6 +175,7 @@ func startUI(update chan *network.RoomUpdate, cmd chan<- network.GameMsg, charac
   redraw := make(chan bool)
   done := make(chan bool)
 
+  clearActivity := false
   for {
     select {
     // Get an event from the keyboard, mouse, screen resize, etc
@@ -200,6 +206,12 @@ func startUI(update chan *network.RoomUpdate, cmd chan<- network.GameMsg, charac
               //TODO: alert the user somehow
               break
             }
+            // Set a flag so we know to clear the activity list on the next update
+            if msg.CmdReq.Cmd == "go" {
+              // go command will produce a room update or an error msg
+              // both with set this back to false, the room update after clearing the list
+              clearActivity = true 
+            }
             cmd <- msg
             cmdPar.Text = ""
             go func() { redraw <- true }()
@@ -217,6 +229,11 @@ func startUI(update chan *network.RoomUpdate, cmd chan<- network.GameMsg, charac
         entityList.Height = (height-3)/2
         activityList.Height = (height-3)/2
 
+        if len(activityList.Items) > (activityList.Height-2) {
+          //Slice the top off
+          activityList.Items = activityList.Items[len(activityList.Items)-(activityList.Height-2):len(activityList.Items)]
+        }
+
         ui.Body.Width = ui.TermWidth()
         ui.Body.Align()
         go func() { redraw <- true }()
@@ -230,43 +247,61 @@ func startUI(update chan *network.RoomUpdate, cmd chan<- network.GameMsg, charac
       entities = append(entities, u.Npcs...)
       entityList.Items = entities;
 
+      if clearActivity {
+        activityList.Items = nil
+        clearActivity = false
+      }
       if u.Message != "" {
-        activityList.Items = append(activityList.Items, u.Message)
+        addActivity(activityList, u.Message)
       }
 
       exitStr := ""
       if u.North {
         exitStr += "       ^ North\n"
       } else {
-        exitStr += "\n"
+        exitStr += "              \n"
       }
       if u.West{
-        exitStr += "West <  "
+        exitStr += "West < "
       } else {
-        exitStr += "      "
+        exitStr += "       "
       }
       if u.East {
-        exitStr += "   > East \n"
+        exitStr += "  > East \n"
       } else {
-        exitStr += "          \n"
+        exitStr += "         \n"
       }
       if u.South {
         exitStr += "       v South"
       }
 
       exitPar.Text =  exitStr
-
       descPar.Text = u.Desc
       descPar.Border.Label = u.Name
 
       go func() { redraw <- true }()
 
+    // Local write request to activity dialog
+    case a := <-activity:
+      clearActivity = false 
+      addActivity(activityList, a)
+      go func() { redraw <- true }()
     // Request to redraw
     case <-redraw:
       ui.Render(ui.Body)
     // We are done
     case <-done:
       return
+    }
+  }
+}
+
+func addActivity(list *ui.List, item string) {
+  if list != nil {
+    list.Items = append(list.Items, item)
+    if len(list.Items) > (list.Height-2) {
+      //Slice the top one off
+      list.Items = list.Items[1:len(list.Items)]
     }
   }
 }

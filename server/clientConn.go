@@ -118,6 +118,7 @@ func (client ClientConn) clientReceiver() {
         case "say":
           resp.Resp.Success = true;
           client.room.CmdChanWriteAsync <- *req
+
         case "go":
           var dir int
           resp.Resp.Success = true
@@ -136,8 +137,19 @@ func (client ClientConn) clientReceiver() {
           if !resp.Resp.Success {
             break
           }
+          coords := client.actor.Coords
           gWorld.RoomFetcherInChan <- RoomFetcherMsg{Direction:dir, RoomCoords:&client.actor.Coords}
           fetcherMsg := <- gWorld.RoomFetcherOutChan;
+          if fetcherMsg.Room == nil || fetcherMsg.RoomCoords == nil {
+            // Error from room fetcher
+            resp.Resp.Success = false
+            break
+          }
+          if coords.Row == client.actor.Coords.Row && coords.Col == client.actor.Coords.Col {
+            resp.Resp.Success = false
+            resp.Resp.Message = "You cannot go that way"
+            break
+          }
 
           client.room.CmdChanWriteSync <- RoomHandlerCmd{Actor:client.actor, Cmd:"rem", UpdateChan:client.SendChanWrite}
           resp.Resp.Success = <-client.room.CmdChanReadSync
