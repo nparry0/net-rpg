@@ -18,13 +18,16 @@ type RoomCoords struct {
 type Room struct {
   Name string
   Desc string
-  Pcs map[string]*Actor
-  Npcs map[string]*Actor
+  Pcs map[string]*Pc
+  Npcs map[string]*Npc
   //TODO: Items
   North bool
   South bool
   East bool
   West bool
+
+  // JSON entities
+  NpcEntities []*Npc
 
   // Send commands to the room asynchronously (with a pipe)
   CmdChanReadAsync <-chan network.GameMsg
@@ -40,7 +43,7 @@ type Room struct {
 // Similar to CmdReq in the GameMsg, but with more info
 // Sent in the synchronous chan, but GameMsgs are sent in the async
 type RoomHandlerCmd struct {
-  Actor *Actor
+  Pc *Pc
   Cmd string
   Arg1 string
   UpdateChan chan<- network.GameMsg
@@ -48,10 +51,16 @@ type RoomHandlerCmd struct {
 
 func (room *Room)createRoomUpdate(msg string)(network.GameMsg){
   pcs := make([]string, len(room.Pcs))
+  npcs := make([]string, len(room.Npcs))
 
   i := 0
-  for k := range room.Pcs{
+  for k := range room.Pcs {
     pcs[i] = k
+    i++
+  }
+  i = 0
+  for k := range room.Npcs {
+    npcs[i] = k
     i++
   }
 
@@ -59,7 +68,7 @@ func (room *Room)createRoomUpdate(msg string)(network.GameMsg){
     Name:room.Name,
     Desc:room.Desc,
     Pcs:pcs,
-    Npcs:[]string{},
+    Npcs:npcs,
     North:room.North,
     South:room.South,
     East:room.East,
@@ -79,11 +88,11 @@ func roomHandler(room *Room)(){
         ret := true
         switch cmd.Cmd {
           case "add":
-            room.Pcs[cmd.Actor.Name] = cmd.Actor
-            room.UpdateChans[cmd.Actor.Name] = cmd.UpdateChan
+            room.Pcs[cmd.Pc.Name] = cmd.Pc
+            room.UpdateChans[cmd.Pc.Name] = cmd.UpdateChan
           case "rem":
-            delete(room.Pcs, cmd.Actor.Name)
-            delete(room.UpdateChans, cmd.Actor.Name)
+            delete(room.Pcs, cmd.Pc.Name)
+            delete(room.UpdateChans, cmd.Pc.Name)
           default:
             log.Printf("Invalid sync game message command %s\n", cmd.Cmd)
             ret = false
@@ -215,6 +224,7 @@ func (world World) roomFetcher() {
         msg.Room = nil
         msg.RoomCoords = nil
       }
+
       world.RoomFetcherOutChan <- msg
     }
 }
@@ -256,11 +266,16 @@ func NewWorld()(*World, error){
     for _, h := range region.Rows {
       for _, room := range h {
         //log.Printf(room);
-        room.Pcs = make(map[string]*Actor);
+        room.Pcs = make(map[string]*Pc);
+        room.Npcs = make(map[string]*Npc);
         room.CmdChanWriteAsync, room.CmdChanReadAsync = network.NewPipe()
         room.CmdChanWriteSync = make(chan RoomHandlerCmd)
         room.CmdChanReadSync = make(chan bool)
         room.UpdateChans = make(map[string]chan<- network.GameMsg);
+        for _, npc := range room.NpcEntities {
+          room.Npcs[npc.Name] = npc 
+        }
+    
         go roomHandler(room)
       }
     }

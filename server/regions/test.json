@@ -5,7 +5,10 @@
       {
         "Name":"NW Test Room",
         "Desc":"Sterile, bland room with boring, off-white paint job and tile flooring.  You feel like a lab rat in here.  There is a small, rusty metal desk with an old office chair here.  On the desk is a disorganized pile of paper forms, with unsharpened pencils littered about.  Whoever occupies this work area could use a change of career.",
-        "South": true, "East": true
+        "South": true, "East": true,
+        "NpcEntities":[
+          { "Name":"Tired employee", "Hp":10, "MaxHp":10, "Aggro":0, "Mobile":false, "Respawn":60 }
+        ]
       },
       {
         "Name":"NE Test Room",

@@ -7,9 +7,10 @@ import (
 )
 
 type ClientConn struct {
-  user *User;  
-  actor *Actor;  
-  room *Room;
+  user *User
+  pc *Pc
+  roomCoords *RoomCoords
+  room *Room
   GameConn *network.GameConn // TODO: maybe split the send and recieve parts here, for better exclusive access?
 
   RoomChan <-chan network.GameMsg       // Read room updates
@@ -78,14 +79,14 @@ func (client ClientConn) clientReceiver() {
         log.Printf("Attempted to assume %s without logging in\n", req.AssumeActorReq.Actor)
         resp.Resp.Message = "You must log in first"
         break;
-      } else if client.actor != nil {
+      } else if client.pc!= nil {
         //TODO: Allow user to switch players
         log.Printf("User %s attempted to assume a second actor %s\n", client.user.Username, req.AssumeActorReq.Actor)
         resp.Resp.Message = "You cannot play two characters at once."
         break;
       }
 
-      client.actor, err = assumeActor(req.AssumeActorReq.Actor, client.user)
+      client.pc, client.roomCoords, err = NewPc(req.AssumeActorReq.Actor, client.user)
       if err != nil {
         log.Printf("User %s failed to assume actor %s\n", client.user.Username, req.AssumeActorReq.Actor)
         resp.Resp.Message = "Unable to use that character"
@@ -93,16 +94,16 @@ func (client ClientConn) clientReceiver() {
       } 
 
       // Successfully assumed an actor.  Get our room's channels and ask the room to add us.
-      gWorld.RoomFetcherInChan <- RoomFetcherMsg{Direction:NoDirection, RoomCoords:&client.actor.Coords}
+      gWorld.RoomFetcherInChan <- RoomFetcherMsg{Direction:NoDirection, RoomCoords:client.roomCoords}
       fetcherMsg := <- gWorld.RoomFetcherOutChan;
 
       client.room = fetcherMsg.Room
-      client.room.CmdChanWriteSync <- RoomHandlerCmd{Actor:client.actor, Cmd:"add", UpdateChan:client.SendChanWrite}
+      client.room.CmdChanWriteSync <- RoomHandlerCmd{Pc:client.pc, Cmd:"add", UpdateChan:client.SendChanWrite}
       resp.Resp.Success = <-client.room.CmdChanReadSync
 
       if ( resp.Resp.Success ) {
         log.Printf("User %s successfully assumed actor %s\n", client.user.Username, req.AssumeActorReq.Actor)
-        resp.Resp.Message = "Successfully assumed character " + client.actor.Name
+        resp.Resp.Message = "Successfully assumed character " + client.pc.Name
       } else {
         log.Printf("User %s failed to enter room with %s\n", client.user.Username, req.AssumeActorReq.Actor)
         resp.Resp.Message = "Failed to enter room"
@@ -111,7 +112,7 @@ func (client ClientConn) clientReceiver() {
     // Command
     case network.TypeCmdReq:
       // Assign actor
-      req.CmdReq.Actor = client.actor.Name
+      req.CmdReq.Actor = client.pc.Name
 
       // Validate that it is a supported command, no sense in clogging up the room handler if it's not
       switch req.CmdReq.Cmd {
@@ -137,28 +138,28 @@ func (client ClientConn) clientReceiver() {
           if !resp.Resp.Success {
             break
           }
-          coords := client.actor.Coords
-          gWorld.RoomFetcherInChan <- RoomFetcherMsg{Direction:dir, RoomCoords:&client.actor.Coords}
+          coords := *client.roomCoords
+          gWorld.RoomFetcherInChan <- RoomFetcherMsg{Direction:dir, RoomCoords:client.roomCoords}
           fetcherMsg := <- gWorld.RoomFetcherOutChan;
           if fetcherMsg.Room == nil || fetcherMsg.RoomCoords == nil {
             // Error from room fetcher
             resp.Resp.Success = false
             break
           }
-          if coords.Row == client.actor.Coords.Row && coords.Col == client.actor.Coords.Col {
+          if coords.Row == client.roomCoords.Row && coords.Col == client.roomCoords.Col {
             resp.Resp.Success = false
             resp.Resp.Message = "You cannot go that way"
             break
           }
 
-          client.room.CmdChanWriteSync <- RoomHandlerCmd{Actor:client.actor, Cmd:"rem", UpdateChan:client.SendChanWrite}
+          client.room.CmdChanWriteSync <- RoomHandlerCmd{Pc:client.pc, Cmd:"rem", UpdateChan:client.SendChanWrite}
           resp.Resp.Success = <-client.room.CmdChanReadSync
 
           if !resp.Resp.Success {
             break
           }
 
-          fetcherMsg.Room.CmdChanWriteSync <- RoomHandlerCmd{Actor:client.actor, Cmd:"add", UpdateChan:client.SendChanWrite}
+          fetcherMsg.Room.CmdChanWriteSync <- RoomHandlerCmd{Pc:client.pc, Cmd:"add", UpdateChan:client.SendChanWrite}
           resp.Resp.Success = <-fetcherMsg.Room.CmdChanReadSync
 
           if !resp.Resp.Success {
