@@ -154,6 +154,7 @@ func (world World) roomFetcher() {
     log.Printf("Started room fetcher\n")
 
     for {
+      var curRoom *Room
       msg = <-world.RoomFetcherInChan
 
       // Check that the room they are in now actually exists
@@ -169,34 +170,44 @@ func (world World) roomFetcher() {
         continue
       }
 
+      curRoom = region.Rows[msg.RoomCoords.Row][msg.RoomCoords.Col]
+
       // Check that the room we are going to exists 
       switch msg.Direction {
       case NoDirection:
         msg.Room = region.Rows[msg.RoomCoords.Row][msg.RoomCoords.Col]
       case North:
-        msg.RoomCoords.Row -= 1;
-        if  msg.RoomCoords.Row < 0 {
-          msg.RoomCoords.Row = 0;
+        if curRoom.North {
+          msg.RoomCoords.Row -= 1;
+          if  msg.RoomCoords.Row < 0 {
+            msg.RoomCoords.Row = 0;
+          }
         }
         msg.Room = region.Rows[msg.RoomCoords.Row][msg.RoomCoords.Col]
       case South:
-        msg.RoomCoords.Row += 1;
-        len := len(region.Rows)
-        if  msg.RoomCoords.Row >= len {
-          msg.RoomCoords.Row = len-1;
+        if curRoom.South {
+          msg.RoomCoords.Row += 1;
+          len := len(region.Rows)
+          if  msg.RoomCoords.Row >= len {
+            msg.RoomCoords.Row = len-1;
+          }
         }
         msg.Room = region.Rows[msg.RoomCoords.Row][msg.RoomCoords.Col]
       case East:
-        msg.RoomCoords.Col += 1;
-        len := len(region.Rows[msg.RoomCoords.Row])
-        if  msg.RoomCoords.Col >= len {
-          msg.RoomCoords.Col = len-1;
+        if curRoom.East {
+          msg.RoomCoords.Col += 1;
+          len := len(region.Rows[msg.RoomCoords.Row])
+          if  msg.RoomCoords.Col >= len {
+            msg.RoomCoords.Col = len-1;
+          }
         }
         msg.Room = region.Rows[msg.RoomCoords.Row][msg.RoomCoords.Col]
       case West:
-        msg.RoomCoords.Col -= 1;
-        if  msg.RoomCoords.Col < 0 {
-          msg.RoomCoords.Col = 0;
+        if curRoom.West {
+          msg.RoomCoords.Col -= 1;
+          if  msg.RoomCoords.Col < 0 {
+            msg.RoomCoords.Col = 0;
+          }
         }
         msg.Room = region.Rows[msg.RoomCoords.Row][msg.RoomCoords.Col]
       default:

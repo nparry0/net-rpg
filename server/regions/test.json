@@ -9,8 +9,8 @@
       },
       {
         "Name":"NE Test Room",
-        "Desc":"Sterile, bland room with boring, off-white paint job and tile flooring.  You feel like a lab rat in here.",
-        "South": true, "West": true
+        "Desc":"Sterile, bland room with boring, off-white paint job and tile flooring.  You feel like a lab rat in here.  There is a south door, but it is barred with a heavy padlock.",
+        "West": true
       }
     ],
     [
@@ -21,8 +21,8 @@
       },
       {
         "Name":"SE Test Room",
-        "Desc":"Sterile, bland room with boring, off-white paint job and tile flooring.  You feel like a lab rat in here.  There is a small window looking outside, but it is gray and cloudy.",
-        "North": true, "West": true
+        "Desc":"Sterile, bland room with boring, off-white paint job and tile flooring.  You feel like a lab rat in here.  There is a small window looking outside, but it is gray and cloudy.  There is a north door, but it is barred with a heavy padlock.",
+        "West": true
       }
     ]
   ]
