@@ -6,6 +6,9 @@ import (
   "io/ioutil"
   "path/filepath"
   "github.com/nparry0/network"
+  "math/rand"
+  "time"
+  "strconv"
 )
 
 /***** Room *****/
@@ -80,6 +83,8 @@ func (room *Room)createRoomUpdate(msg string)(network.GameMsg){
 func roomHandler(room *Room)(){
   log.Printf("Starting handler for room %s\n", room.Name)
 
+  rand := rand.New(rand.NewSource(time.Now().UnixNano()))
+
   for {
     msg := ""
     select {
@@ -105,6 +110,16 @@ func roomHandler(room *Room)(){
         switch cmd.CmdReq.Cmd {
           case "say":
             msg = cmd.CmdReq.Actor + " says \"" + cmd.CmdReq.Arg1 + "\""
+          case "attack":
+            // TODO: Attack PCs if the PC has PvP on
+            if target, ok := room.Npcs[cmd.CmdReq.Arg1]; ok {
+              dmg := rand.Intn(10)+1; // 1-10
+              msg = cmd.CmdReq.Actor + " attacks " + cmd.CmdReq.Arg1 + " for " + strconv.Itoa(dmg) + " damage."
+              if target.DecHp(dmg) <= 0 {
+                msg += " " + cmd.CmdReq.Arg1 + " has died.\n"
+                delete(room.Npcs, cmd.CmdReq.Arg1)
+              }
+            }
           default:
             log.Printf("Invalid async game message command\n")
         }

@@ -117,6 +117,7 @@ func (client ClientConn) clientReceiver() {
       // Validate that it is a supported command, no sense in clogging up the room handler if it's not
       switch req.CmdReq.Cmd {
         case "say":
+        case "attack":
           resp.Resp.Success = true;
           client.room.CmdChanWriteAsync <- *req
 

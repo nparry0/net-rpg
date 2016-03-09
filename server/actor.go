@@ -13,6 +13,17 @@ type Actor struct {
   MaxHp int
 }
 
+func (actor *Actor) DecHp(hp int)(int) {
+  actor.Hp -= hp;
+
+  if actor.Hp < 0 {
+    actor.Hp = 0
+  } else if actor.Hp > actor.MaxHp {
+    actor.Hp = actor.MaxHp
+  }
+  return actor.Hp
+}
+
 type Pc struct {
   Actor
 }
@@ -30,9 +41,11 @@ type PcJson struct {
 }
 
 //TODO: When AI is smart enough to handle more aggro levels, we could have more levels above and below hostile
+// The NPCs move through different aggro levels when they are attacked by a PC
+// These are values in a json file, don't change them
 const (
-  AggroNone = 0    // Attacks PCs only if attacked first
-  AggroHostile = 1 // Attacks PCs on sight
+  AggroNone = 0     // Does not attack PC
+  AggroHostile = 10 // Attacks PCs on sight
 )
 
 func NewPc(actorName string, user *User)(*Pc, *RoomCoords, error) {
