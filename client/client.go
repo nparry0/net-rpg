@@ -176,6 +176,9 @@ func startUI(update chan *network.RoomUpdate, activity chan string, cmd chan<- n
   done := make(chan bool)
 
   clearActivity := false
+  var prevCmds []string
+  prevCmd := 0
+
   for {
     select {
     // Get an event from the keyboard, mouse, screen resize, etc
@@ -213,8 +216,26 @@ func startUI(update chan *network.RoomUpdate, activity chan string, cmd chan<- n
               clearActivity = true 
             }
             cmd <- msg
+            prevCmds = append(prevCmds, cmdPar.Text)
+            prevCmd = len(prevCmds)
             cmdPar.Text = ""
             go func() { redraw <- true }()
+          case ui.KeyArrowUp:
+            if prevCmd > 0 {
+              prevCmd--;
+              cmdPar.Text = prevCmds[prevCmd]
+              go func() { redraw <- true }()
+            }
+          case ui.KeyArrowDown:
+            if prevCmd < (len(prevCmds)-1) {
+              prevCmd++;
+              cmdPar.Text = prevCmds[prevCmd]
+              go func() { redraw <- true }()
+            } else if prevCmd == (len(prevCmds)-1) {
+              prevCmd++;
+              cmdPar.Text = "" 
+              go func() { redraw <- true }()
+            }
           //default:
           //  cmdPar.Text += strconv.Itoa(int(e.Key))
           //  go func() { redraw <- true }()
