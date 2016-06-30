@@ -41,6 +41,10 @@ func (client ClientConn) clientReceiver() {
 
     req, msgType, err := network.Recv(client.GameConn)
     if err != nil {
+      if client.room != nil { 
+        client.room.CmdChanWriteSync <- RoomHandlerCmd{Pc:client.pc, Cmd:"rem"}
+        <-client.room.CmdChanReadSync
+      }
       log.Print(err)
       return
     }
